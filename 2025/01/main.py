@@ -1,10 +1,6 @@
 import os
-import re
 import time
-
-
-def nums(line: str) -> tuple[int, ...]:
-    return tuple(map(int, re.findall(r"-?\d+", line)))
+from itertools import batched
 
 
 def get_data(test: bool = False) -> str:
@@ -17,31 +13,28 @@ class Solution:
     def __init__(self, test=False):
         self.test = test
         data = get_data(test=test).strip("\n").split("\n")
-        num = data[:-1]
-        stuff = data[-1]
 
-        self.nums = list(map(int, num))
-        self.corrections = stuff
+        self.nums = list(map(int, data[:-1]))
+        self.signs = data[-1]
+
+    def run(self, nums: list[int], signs: str, strict=True):
+        c = next(nums)
+        for n, s in zip(nums, signs, strict=strict):
+            c += n * (-1 if s == "-" else 1)
+        return c
 
     def part1(self):
-        c = self.nums[0]
-        for n, s in zip(self.nums[1:], self.corrections, strict=True):
-            c += n * (-1 if s == "-" else 1)
-        return c
+        return self.run(iter(self.nums), self.signs)
 
     def part2(self):
-        c = self.nums[0]
-        for n, s in zip(self.nums[1:], self.corrections[::-1], strict=True):
-            c += n * (-1 if s == "-" else 1)
-        return c
+        return self.run(iter(self.nums), self.signs[::-1])
 
     def part3(self):
-        c = self.nums[0] * 10 + self.nums[1]
-        for i in range(2, len(self.nums), 2):
-            num = self.nums[i] * 10 + self.nums[i + 1]
-            thing = -1 if self.corrections[::-1][i // 2 - 1] == "-" else 1
-            c += thing * num
-        return c
+        return self.run(
+            map(lambda x: x[0] * 10 + x[1], batched(self.nums, 2)),
+            self.signs[::-1],
+            strict=False,
+        )
 
 
 def main():
@@ -56,12 +49,9 @@ def main():
     print(f"(TEST) Part 3: {test3}, \t{'correct :)' if test3 == 189 else 'wrong :('}")
 
     solution = Solution()
-    part1 = solution.part1()
-    part2 = solution.part2()
-    part3 = solution.part3()
-    print(f"Part 1: {part1}")
-    print(f"Part 2: {part2}")
-    print(f"Part 3: {part3}")
+    print(f"Part 1: {solution.part1()}")
+    print(f"Part 2: {solution.part2()}")
+    print(f"Part 3: {solution.part3()}")
 
     print(f"\nTotal time: {time.perf_counter() - start : .4f} sec")
 
