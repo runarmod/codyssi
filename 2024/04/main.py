@@ -2,8 +2,9 @@ import itertools
 import os
 import re
 import time
+from collections import defaultdict, deque
+from operator import itemgetter
 
-import networkx
 from more_itertools import ilen
 
 
@@ -15,29 +16,42 @@ def get_data(test: bool = False) -> str:
 
 class Solution:
     def __init__(self, test=False):
-        self.G = networkx.Graph(
-            itertools.batched(re.findall(r"[A-Z]+", get_data(test=test).strip("\n")), 2)
-        )
+        data = itertools.batched(re.findall(r"\w+", get_data(test=test).strip("\n")), 2)
+
+        self.G = defaultdict(set)
+        for start, end in data:
+            self.G[start].add(end)
+            self.G[end].add(start)
+
         self.start = "STT"
 
     def part1(self):
-        return self.G.number_of_nodes()
+        return len(self.G)
+
+    def reachable(self, node, maxlen=float("inf")):
+        stack = deque([[node]])
+        seen = set()
+
+        while stack:
+            path = stack.popleft()
+            node = path[-1]
+
+            if len(path) > maxlen + 1:
+                break
+            if node in seen:
+                continue
+            seen.add(node)
+
+            yield path, len(path) - 1  # -1 because first element is start-node
+
+            for node2 in self.G[node]:
+                stack.append((path + [node2]))
 
     def part2(self):
-        return ilen(
-            filter(
-                lambda path: len(path) <= 3 + 1,
-                networkx.shortest_path(self.G, self.start).values(),
-            )
-        )
+        return ilen(self.reachable(self.start, 3))
 
     def part3(self):
-        return sum(
-            map(
-                lambda path: len(path) - 1,
-                networkx.shortest_path(self.G, self.start).values(),
-            )
-        )
+        return sum(map(itemgetter(1), self.reachable(self.start)))
 
 
 def main():
@@ -45,10 +59,10 @@ def main():
 
     test = Solution(test=True)
     test1 = test.part1()
-    test2 = test.part2()
-    test3 = test.part3()
     print(f"(TEST) Part 1: {test1}, \t{'correct :)' if test1 == 7 else 'wrong :('}")
+    test2 = test.part2()
     print(f"(TEST) Part 2: {test2}, \t{'correct :)' if test2 == 6 else 'wrong :('}")
+    test3 = test.part3()
     print(f"(TEST) Part 3: {test3}, \t{'correct :)' if test3 == 15 else 'wrong :('}")
 
     solution = Solution()
