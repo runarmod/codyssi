@@ -1,6 +1,9 @@
 import os
+import re
 import time
 from functools import partial
+
+from more_itertools import flatten
 
 
 def get_data(test: bool = False) -> str:
@@ -15,29 +18,15 @@ class Solution:
         self.data = get_data(test=test).strip().split("\n")
 
     def part1(self):
-        return sum(c.isalpha() for line in self.data for c in line)
+        return sum(map(str.isalpha, flatten(self.data)))
 
     def reduce(self, line, reduceHyphen=True):
-        cont = True
-        while cont:
-            cont = False
-            for i in range(len(line)):
-                try:
-                    if line[i].isdigit() and (
-                        line[i + 1].isalpha() or (line[i + 1] == "-" and reduceHyphen)
-                    ):
-                        line = line[:i] + line[i + 2 :]
-                        cont = True
-                        break
-                    if line[i + 1].isdigit() and (
-                        line[i].isalpha() or (line[i] == "-" and reduceHyphen)
-                    ):
-                        line = line[:i] + line[i + 2 :]
-                        cont = True
-                        break
-                except IndexError:
-                    pass
-        return line
+        alph = r"[a-zA-Z\-]" if reduceHyphen else r"[a-zA-Z]"
+        while True:
+            length = len(line)
+            line = re.sub(f"\\d{alph}|{alph}\\d", "", line, count=1)
+            if length == len(line):
+                return line
 
     def part2(self):
         return sum(map(len, map(partial(self.reduce, reduceHyphen=True), self.data)))
