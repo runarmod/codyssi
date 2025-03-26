@@ -31,22 +31,25 @@ class Solution:
         self.rows = numsNested(
             map(str.split, get_data(test=test).strip("\n").split("\n"))
         )
+        self.lowest_safety = min(itertools.chain(*self.rows))
 
     def part1(self):
         return min(*(map(sum, itertools.chain(self.rows, zip(*self.rows)))))
 
     def part2(self):
-        return self.dijkstra((0, 0), (14, 14))
+        return self.A_star((0, 0), (14, 14))
 
     def part3(self):
-        return self.dijkstra((0, 0), (len(self.rows) - 1, len(self.rows[0]) - 1))
+        return self.A_star((0, 0), (len(self.rows) - 1, len(self.rows[0]) - 1))
 
-    def dijkstra(self, start: tuple[int, int], end: tuple[int, int]):
-        q = [(self.rows[start[1]][start[0]], *start)]  # (danger, x, y)
+    def A_star(self, start: tuple[int, int], end: tuple[int, int]):
+        q = [
+            (0, self.rows[start[1]][start[0]], *start)
+        ]  # (manhattan_distance + danger (=heuristic), danger, x, y)
         visited = set()  # (x, y)
 
         while q:
-            danger, x, y = heapq.heappop(q)
+            _, danger, x, y = heapq.heappop(q)
             if (x, y) == end:
                 return danger
             visited.add((x, y))
@@ -54,7 +57,12 @@ class Solution:
                 (x, y), bounds=[range(0, len(self.rows)), range(0, len(self.rows[0]))]
             ):
                 if (nx, ny) not in visited:
-                    heapq.heappush(q, (danger + self.rows[ny][nx], nx, ny))
+                    new_danger = danger + self.rows[ny][nx]
+                    distance = manhattan((nx, ny), end)
+                    heuristic = new_danger + distance
+                    heapq.heappush(
+                        q, (self.lowest_safety * heuristic, new_danger, nx, ny)
+                    )
         return None
 
 
@@ -89,6 +97,10 @@ def neighbors4(
                 or nc in bounds[i]
             ):
                 yield point[:i] + (nc,) + point[i + 1 :]
+
+
+def manhattan(p1: tuple[int, ...], p2: tuple[int, ...]):
+    return sum(abs(a - b) for a, b in zip(p1, p2))
 
 
 if __name__ == "__main__":
