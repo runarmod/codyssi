@@ -1,7 +1,7 @@
-import itertools
 import os
 import string
 import time
+from math import ceil
 
 
 def get_data(test: bool = False) -> str:
@@ -33,20 +33,17 @@ def to_base(num: int, base: int) -> str:
 
 class Solution:
     def __init__(self, test=False):
-        data = (line.split(" ") for line in get_data(test=test).strip("\n").split("\n"))
-        self.parsed = list(map(lambda x: (from_base(x[0], int(x[1])), int(x[1])), data))
+        data = map(str.split, get_data(test=test).strip("\n").split("\n"))
+        self.nums = list(map(lambda x: from_base(x[0], int(x[1])), data))
 
     def part1(self):
-        return max(self.parsed, key=lambda x: x[0])[0]
+        return max(self.nums)
 
     def part2(self):
-        return to_base(sum(x[0] for x in self.parsed), 68)
+        return to_base(sum(self.nums), 68)
 
     def part3(self):
-        s = sum(x[0] for x in self.parsed)
-        for i in itertools.count():
-            if i**4 > s:
-                return i
+        return ceil(sum(self.nums) ** (1 / 4))
 
 
 def main():
@@ -62,7 +59,9 @@ def main():
     print(
         f"(TEST) Part 2: {test2}, \t{'correct :)' if test2 == '4iWAbo%6' else 'wrong :('}"
     )
-    print(f"(TEST) Part 3: {test3}, \t\t{'correct :)' if test3 == 2366 else 'wrong :('}")
+    print(
+        f"(TEST) Part 3: {test3}, \t\t{'correct :)' if test3 == 2366 else 'wrong :('}"
+    )
 
     solution = Solution()
     print(f"Part 1: {solution.part1()}")
