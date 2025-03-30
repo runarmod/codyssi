@@ -1,12 +1,32 @@
+import functools
 import os
 import re
 import time
+from collections import defaultdict, namedtuple
+from operator import itemgetter
 
 
 def get_data(test: bool = False) -> str:
     directory = os.path.dirname(os.path.realpath(__file__))
     file = os.path.join(directory, f"{"test" if test else ""}input.txt")
     return open(file).read()
+
+
+class Point:
+    def __init__(self, *coords):
+        self.coords = coords
+
+    def __add__(self, other):
+        return Point(*(a + b for a, b in zip(self.coords, other.coords)))
+
+    def __lt__(self, other):
+        return self.coords < other.coords
+
+    def multiply_coords(self):
+        return functools.reduce(lambda x, y: x * y, self.coords)
+
+
+Item = namedtuple("Item", ["name", "quality", "cost", "unique_materials"])
 
 
 class Solution:
@@ -17,39 +37,42 @@ class Solution:
             get_data(test=test).strip("\n"),
         )
         self.data = [
-            (name, int(quality), int(cost), int(unique_materials))
+            Item(name, int(quality), int(cost), int(unique_materials))
             for name, quality, cost, unique_materials in data
         ]
+        self.w = list(map(itemgetter(2), self.data))
+        self.v = list(map(lambda x: Point(x.quality, -x.unique_materials), self.data))
 
     def part1(self):
         return sum(
-            x[-1] for x in sorted(self.data, key=lambda x: x[1], reverse=True)[:5]
+            x.unique_materials
+            for x in sorted(self.data, key=lambda x: x.quality, reverse=True)[:5]
         )
 
-    def budget(self, limit: int = 30, start_index: int = 0):
-        for i, item in enumerate(self.data[start_index:], start=start_index):
-            if item[2] > limit:
-                continue
-            yield (item,)
-            for sub_item in self.budget(limit - item[2], i + 1):
-                yield (item,) + sub_item
+    def find_items(self, total_limit: int):
+        dp = defaultdict(lambda: Point(0, 0))
+
+        for item in range(len(self.data)):
+            for limit in range(1, total_limit + 1):
+                if self.w[item] > limit:
+                    dp[item, limit] = dp[item - 1, limit]
+                else:
+                    dp[item, limit] = max(
+                        dp[item - 1, limit - self.w[item]] + self.v[item],
+                        dp[item - 1, limit],
+                    )
+        return dp
 
     def calculate(self, limit: int):
-        possible_combos = self.budget(limit=limit)
-
-        combo = max(
-            possible_combos,
-            key=lambda x: (sum(item[1] for item in x), -sum(item[3] for item in x)),
-        )
-        quality = sum(item[1] for item in combo)
-        unique_materials = sum(item[3] for item in combo)
-        return quality * unique_materials
+        dp = self.find_items(limit)
+        # Negative, since we here use negative materials to get correct (based on the task) comparison of points
+        return -max(dp.values()).multiply_coords()
 
     def part2(self):
         return self.calculate(30)
 
     def part3(self):
-        return self.calculate(150)
+        return self.calculate(150 if self.test else 300)
 
 
 def main():
