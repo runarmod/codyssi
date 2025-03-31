@@ -1,8 +1,12 @@
 import itertools
+import operator
 import os
 import re
 import time
+from collections import namedtuple
 from copy import deepcopy
+
+import numpy as np
 
 
 def nums(line: str) -> tuple[int, ...]:
@@ -15,82 +19,101 @@ def get_data(test: bool = False) -> str:
     return open(file).read()
 
 
+shift_line = namedtuple("shift_line", ["rowcol", "index", "amount"])
+modify_line = namedtuple("modify_line", ["operation", "amount", "rowcol", "index"])
+modify_all = namedtuple("modify_all", ["operation", "amount"])
+
+
+def map_keep_on_error(func, iterable, *exceptions):
+    for item in iterable:
+        try:
+            yield func(item)
+        except exceptions:
+            yield item
+
+
+def parse_operation(operation_list):
+    if len(operation_list[0]):
+        return shift_line(*map_keep_on_error(int, operation_list[:3], ValueError))
+    elif len(operation_list[3]):
+        return modify_line(*map_keep_on_error(int, operation_list[3:7], ValueError))
+    elif len(operation_list[7]):
+        return modify_all(*map_keep_on_error(int, operation_list[7:], ValueError))
+    else:
+        raise ValueError("Invalid operation list")
+
+
 class Solution:
     def __init__(self, test=False):
-        self.test = test
         numbers, operations, actions = get_data(test=test).strip("\n").split("\n\n")
-        self.numbers = list(map(nums, numbers.split("\n")))
+        self.numbers = np.array(list(map(nums, numbers.split("\n"))))
         self.operations = re.findall(
             r"SHIFT (ROW|COL) (\d+) BY (\d+)|(ADD|SUB|MULTIPLY) (\d+) (ROW|COL) (\d+)|(ADD|SUB|MULTIPLY) (\d+) ALL",
             operations,
         )
+        self.operations = list(map(parse_operation, self.operations))
         self.actions = actions.split("\n")
+        self.mod = 1073741824
 
-    def shift(self, numbers, rowcol, index, amount):
-        if rowcol == "ROW":
-            numbers[index] = numbers[index][-amount:] + numbers[index][:-amount]
-        elif rowcol == "COL":
-            numbers = list(zip(*numbers))
-            numbers[index] = numbers[index][-amount:] + numbers[index][:-amount]
-            numbers = list(zip(*numbers))
+    def shft_line(self, numbers, op: shift_line):
+        _slice = (
+            slice(None, op.index - 1) if op.rowcol == "COL" else slice(op.index - 1)
+        )
+        numbers[_slice] = np.concatenate(
+            (numbers[_slice][-op.amount :], numbers[_slice][: -op.amount])
+        )
         return numbers
 
-    def modify(self, numbers, operation, amount, rowcol, index):
+    def mod_line(self, numbers, op: modify_line):
         assert (
-            0 <= index < len(numbers)
-        ), f"Index {index} out of range, must be between 0 and {len(numbers)-1}"
-        if rowcol == "COL":
-            numbers = list(zip(*numbers))
-        if operation == "ADD":
-            numbers[index] = [(n + amount) % 1073741824 for n in numbers[index]]
-        elif operation == "SUB":
-            numbers[index] = [n - amount for n in numbers[index]]
-        elif operation == "MULTIPLY":
-            numbers[index] = [(n * amount) % 1073741824 for n in numbers[index]]
-        if rowcol == "COL":
-            numbers = list(zip(*numbers))
+            1 <= op.index <= len(numbers)
+        ), f"Index {op.index} out of range, must be between 1 and {len(numbers)}"
+
+        if op.rowcol == "COL":
+            numbers = numbers.T
+
+        operation = (
+            operator.add
+            if op.operation == "ADD"
+            else operator.sub if op.operation == "SUB" else operator.mul
+        )
+        numbers[op.index - 1] = operation(numbers[op.index - 1], op.amount) % self.mod
+
+        if op.rowcol == "COL":
+            return numbers.T
+
         return numbers
 
-    def modify_all(self, numbers, operation, amount):
-        if operation == "ADD":
-            numbers = [[(n + amount) % 1073741824 for n in row] for row in numbers]
-        elif operation == "SUB":
-            numbers = [[(n - amount) % 1073741824 for n in row] for row in numbers]
-        elif operation == "MULTIPLY":
-            numbers = [[(n * amount) % 1073741824 for n in row] for row in numbers]
-        return numbers
+    def mod_all(self, numbers, op: modify_all):
+        operation = (
+            operator.add
+            if op.operation == "ADD"
+            else operator.sub if op.operation == "SUB" else operator.mul
+        )
+        return operation(numbers, op.amount) % self.mod
 
-    def execute_operation(self, numbers, operation_list):
-        if len(operation_list[0]):
-            rowcol, index, amount, *_ = operation_list
-            numbers = self.shift(numbers, rowcol, int(index) - 1, int(amount))
-        elif len(operation_list[3]):
-            _, _, _, operation, amount, rowcol, index, *_ = operation_list
-            numbers = self.modify(
-                numbers, operation, int(amount), rowcol, int(index) - 1
-            )
-        elif len(operation_list[7]):
-            _, _, _, _, _, _, _, operation, amount = operation_list
-            numbers = self.modify_all(numbers, operation, int(amount))
-        return numbers
-
-    def part1(self):
-        numbers = list(map(list, self.numbers))
-        for operation_list in self.operations:
-            numbers = self.execute_operation(numbers, operation_list)
-
-        max_row = max(map(sum, numbers))
-        max_col = max(map(sum, zip(*numbers)))
-        return max(max_row, max_col)
+    def execute_operation(
+        self, numbers, operation: shift_line | modify_line | modify_all
+    ):
+        func = (
+            self.shft_line
+            if isinstance(operation, shift_line)
+            else self.mod_line if isinstance(operation, modify_line) else self.mod_all
+        )
+        return func(numbers, operation)
 
     def calculate_max_sum(self, numbers):
-        max_row = max(map(sum, numbers))
-        max_col = max(map(sum, zip(*numbers)))
-        return max(max_row, max_col)
+        return max(map(sum, itertools.chain(numbers, numbers.T)))
+
+    def part1(self):
+        numbers = np.copy(self.numbers)
+        for operation in self.operations:
+            numbers = self.execute_operation(numbers, operation)
+        return self.calculate_max_sum(numbers)
 
     def execute_actions(self, actions):
         operations = deepcopy(self.operations)
-        numbers = deepcopy(self.numbers)
+        numbers = np.copy(self.numbers)
         buffer = None
         for action in actions:
             match action:
