@@ -83,12 +83,9 @@ def main():
     print(f"(TEST) Part 3: {test3}, \t{'correct :)' if test3 == None else 'wrong :('}")
 
     solution = Solution()
-    part1 = solution.part1()
-    part2 = solution.part2()
-    part3 = solution.part3()
-    print(part1_text := f"Part 1: {part1}")
-    print(part2_text := f"Part 2: {part2}")
-    print(part3_text := f"Part 3: {part3}")
+    print(f"Part 1: {solution.part1()}")
+    print(f"Part 2: {solution.part2()}")
+    print(f"Part 3: {solution.part3()}")
 
     print(f"\nTotal time: {time.perf_counter() - start : .4f} sec")
 
